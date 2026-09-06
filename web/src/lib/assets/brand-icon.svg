@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="t">
+	<title id="t">iotwong 定位设备管理平台</title>
+	<!-- 品牌图标：圆角方块 + 定位针 + 同心信号弧（定位+信号）。配色取 app.css 品牌蓝 token：
+	     primary oklch(0.52 0.19 262) 转 sRGB = #245FD4；primary/70 叠白 = #668FE1，
+	     组成与顶栏品牌块一致的 to-br 渐变；图形为 white（近似 primary-foreground）。
+	     单一 SVG 源，供 favicon / 顶栏 Logo / 登录页 Logo 复用；viewBox 64x64 方形安全区。 -->
+	<defs>
+		<linearGradient id="brand-bg" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#245FD4"/>
+			<stop offset="1" stop-color="#668FE1"/>
+		</linearGradient>
+	</defs>
+	<rect x="2" y="2" width="60" height="60" rx="15" fill="url(#brand-bg)"/>
+	<g fill="#fff">
+		<!-- 定位针：头心 (32,36) r10，针尖 (32,50) -->
+		<path d="M32 50 L24.86 43 A 10 10 0 1 1 39.14 43 Z"/>
+	</g>
+	<g fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round">
+		<!-- 同心信号弧：围绕针头，开口朝左下（卫星/雷达波束） -->
+		<path d="M17.95 29.45 A 15.5 15.5 0 0 1 46.05 29.45"/>
+		<path d="M12.51 26.91 A 21.5 21.5 0 0 1 51.49 26.91"/>
+	</g>
+</svg>

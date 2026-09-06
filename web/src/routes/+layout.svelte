@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import brandIcon from '$lib/assets/brand-icon.svg';
 	import { onMount } from 'svelte';
 	import { initTheme } from '$lib/theme.svelte';
 
@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" type="image/svg+xml" href={brandIcon} />
 </svelte:head>
 
 <div class="bg-background text-foreground min-h-dvh w-full antialiased">

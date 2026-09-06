@@ -2,6 +2,7 @@
 	// 顶栏：最左=应用图标+名称（点击 Logo 展开/收起侧边菜单）；最右=主题切换 +
 	// 用户下拉（账户信息/用户管理/退出）。
 	import AppIcon from '$lib/components/ui/app-icon.svelte';
+	import brandIcon from '$lib/assets/brand-icon.svg';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { shell } from '$lib/ui-state.svelte';
 	import type { Me } from '$lib/api';
@@ -53,9 +54,14 @@
 		onclick={() => (shell.sidebarPinned = !shell.sidebarPinned)}
 		class="hover:bg-accent group flex min-w-0 items-center gap-2 rounded-md py-1 pr-1.5"
 	>
-		<span class="from-primary to-primary/70 bg-gradient-to-br text-primary-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-lg shadow-sm">
-			<AppIcon name="satellite" class="size-4" />
-		</span>
+		<!-- 品牌图标（brand-icon.svg：定位针 + 信号弧），点击 Logo 展开/收起侧栏 -->
+		<img
+			src={brandIcon}
+			alt=""
+			aria-hidden="true"
+			draggable="false"
+			class="size-8 shrink-0 rounded-lg shadow-sm"
+		/>
 		<span class="truncate text-base font-semibold tracking-tight">
 			iotwong<span class="text-muted-foreground ml-1.5 hidden text-xs font-normal sm:inline">定位设备管理平台</span>
 		</span>

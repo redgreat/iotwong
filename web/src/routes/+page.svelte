@@ -12,6 +12,7 @@
 	import UsersView from '$lib/components/views/users-view.svelte';
 	import { ApiError } from '$lib/api';
 	import { auth, boot, login, logout } from '$lib/auth.svelte';
+	import brandIcon from '$lib/assets/brand-icon.svg';
 
 	onMount(() => { void boot(); });
 
@@ -95,9 +96,7 @@
 {:else if auth.status === 'anon'}
 	<div class="flex min-h-dvh flex-col">
 		<div class="flex h-14 w-full items-center gap-2 px-4">
-			<span class="from-primary to-primary/70 bg-gradient-to-br text-primary-foreground inline-flex size-8 items-center justify-center rounded-lg">
-				<span class="text-sm font-bold">iw</span>
-			</span>
+			<img src={brandIcon} alt="" aria-hidden="true" draggable="false" class="size-8 rounded-lg" />
 			<span class="text-base font-semibold tracking-tight">iotwong</span>
 		</div>
 		<div class="flex flex-1 items-start justify-center px-4 pt-10 sm:pt-16">
