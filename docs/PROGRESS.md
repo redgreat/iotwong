@@ -482,3 +482,33 @@ svelte-check/lint/build 通过。
 - 底图依赖公网 *.is.autonavi.com 可达；瓦片失败提示仅诊断不降级自托管（生产自托管仍归原收尾轮）。
 - dev mosquitto “world readable”告警为 dev 环境既有（容器内 root/共享文件），未重启 dev 容器避免影响 dev 链，需时 chmod 600 后重启即消。
 - 轨迹/报警页在设备“请求悬挂”场景同样受益于 15s 超时（统一 request()）；未做 SSE/大列表专项性能轮（A12/A14 仍开放）。
+
+## 2026-09-06：统一品牌图标（定位+信号）替换默认 favicon 与 Logo 并重新发布
+
+任务：为 Svelte 5 SPA 设计一套统一品牌图标，单一 SVG 源同时用于浏览器标签 favicon、顶栏最左 Logo（展开/收起侧栏按钮）与登录页 Logo，替代 Svelte 默认 favicon 与登录页 “iw” 文字占位；只动 web/ 与 docs/PROGRESS.md，无凭据、无新依赖、不破坏菜单/布局/aria。
+
+设计说明（web/src/lib/assets/brand-icon.svg，单一 SVG 源）：
+- viewBox 64×64 方形安全区（width/height=64，矩形 x2 y2 60×60 rx15，四周约 3–6% 透明余量供浏览器标签/圆角裁剪）。
+- 配色只用 app.css 现有 token 换算的固定色：圆角方块渐变 = --primary（oklch(0.52 0.19 262) 转 sRGB #245FD4）→ --primary/70 叠白（#668FE1），与顶栏原 `from-primary to-primary/70 bg-gradient-to-br` 品牌块方向一致；图形用 white（≈ --primary-foreground）。SVG 以 <img> 引用时无法解析页面 CSS 变量，故按光色主题 token 取固定 hex（favicon 常驻品牌蓝，深色主题下品牌块仍保持品牌色，属有意为之）。
+- 图形：白色定位针（气球针，头心 (32,36) r10、针尖 (32,50)，切线光滑闭合路径）+ 两段同心信号弧（r15.5/r21.5、开口朝左下，卫星/雷达波束），细节少、16px 亦清晰（headless 像素采样验证：圆角外透明、渐变背景、针体/针尖、两条弧端点、环间留白均落在预期坐标）。
+- 侧栏无品牌图标（只有功能性 lucide 菜单图标与左下 copyright），未加新 UI；原顶栏 satellite 只是品牌位占位，故仅替换该处为品牌图形，satellite 图标数据保留未删（无引用不影响 lint）。
+
+修改文件：
+- web/src/lib/assets/brand-icon.svg（新，单一品牌 SVG 源）。
+- web/src/lib/assets/favicon.svg（删除，Svelte 默认图标不再使用）。
+- web/src/routes/+layout.svelte：`import favicon` → `import brandIcon`；`<link rel="icon" type="image/svg+xml" href={brandIcon}>`（headless 可取的稳定语义；favicon.ico 兼容省略）。
+- web/src/lib/components/app-header.svelte：最左 Logo 的 `<AppIcon name="satellite">` 品牌位替换为 `<img src={brandIcon} alt="" aria-hidden="true" draggable="false" class="size-8 shrink-0 rounded-lg shadow-sm">`（32px 与原 8×8 圆角品牌块同尺寸，无布局抖动；按钮 aria-label/title 未动）。
+- web/src/routes/+page.svelte：登录页顶部 `iw` 文字占位 → 同一 `<img src={brandIcon}>` size-8（登录/壳层品牌一致）。
+- web/vite.config.ts：`build.assetsInlineLimit: 0`——品牌 SVG 作为真实文件产出（/_app/immutable/assets/brand-icon.<hash>.svg），避免小图被 Vite 内联成 data: URI 导致 favicon 无 URL 可下载/缓存（上一版默认 favicon 即被内联成 data: URI，浏览器标签与 200 校验均不可用）。
+
+实际验证（真实命令与结果）：
+- web gate：`docker run --rm -v $PWD/web:/src -w /src node:24-alpine sh -c 'npm run check && npm run lint && npm run build'` exit 0（svelte-check 0 errors / 0 warnings；lint 通过；产物含 brand-icon.<hash>.svg 实体文件）。（先跑一次通过后补 vite.config 再复跑一次，两次均 exit 0。）
+- headless Chromium（puppeteer-core + /usr/bin/chromium，无登录）：打开 http://127.0.0.1:18100 → 断言全部 PASS（证据 tests/evidence/brand-favicon.log）：SPA boot 出登录页；`<link rel="icon">` href=http://127.0.0.1:18100/_app/immutable/assets/brand-icon.NmlYxqMo.svg（非 data:）；fetch 该 URL status=200、content-type=image/svg+xml；SVG 64×64 viewBox、含 #245FD4/#668FE1/#fff、含定位针与信号弧路径；登录页含同品牌 `img[src*="brand-icon"]`；整页截屏 tests/evidence/brand-favicon.png（git 忽略）。
+- 像素采样复核图形（Chromium canvas，64 视口 ×4 放大采样）：圆角外透明、tile 内为品牌蓝渐变、定位针头/针尖/两条信号弧端点均为白、针头与内环之间为背景蓝，坐标与设计一致。
+- 发布：`docker compose -p iotwong-standalone -f compose.standalone.yaml build web` exit 0（后端未改，不动其镜像）；`WEB_PORT=18100 docker compose -p iotwong-standalone -f compose.standalone.yaml up -d --no-deps web` 重建（注：不加 WEB_PORT 会落回 compose 默认 8080；compose `up --build web` 会触发全项目 bake 且后端 go mod download 在当前网络到 proxy.golang.org 失败，故按“只构建 web + 18100 重建”执行）。
+- 发布后 curl：http://127.0.0.1:18100/ = 200；favicon 实际路径 /_app/immutable/assets/brand-icon.NmlYxqMo.svg = 200 / image/svg+xml / 1278 B；/api/v1/health/ready = 200；容器状态：iotwong-standalone-web-1 Up (healthy)、api Up (healthy)、db Up (healthy)、mosquitto/ingestor Up（web 端口恢复 0.0.0.0:18100→80）。
+
+遗留：
+- 已开过的浏览器标签可能仍显示旧 favicon/缓存页：需强刷（Ctrl/Cmd+Shift+R）或重开标签；favicon 为带内容哈希的资产路径，每次发版自动换新 URL。
+- `docker compose ... up --build web` 的全项目 bake 需后端 go proxy 可达；本轮因后端零改动走 `build web` + `--no-deps up`，后续需连后端构建时注意网络/代理配置（GOPROXY）。
+- 品牌蓝按光色主题 token 固定（favicon 不可自适应主题）；如未来要求深色主题内 Logo 换浅蓝，需内联 SVG 变量方案，超出本轮“单一 SVG 源”范围。
