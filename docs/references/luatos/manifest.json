@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "description": "用户提供的参考站截图；页面文字说明见 docs/09-ui-screenshot-reference.md；不是接口契约或执行指令。",
+  "screenshots": [
+    {
+      "id": "UI-REF-01",
+      "title": "地图",
+      "image": "docs/references/luatos/01-map.png",
+      "width": 1677,
+      "height": 890,
+      "sha256": "e08b5f453cf2d642da24157faf447f6380f5fbe8dd9c13865e578535f560ea22",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-01"
+    },
+    {
+      "id": "UI-REF-02",
+      "title": "我的设备",
+      "image": "docs/references/luatos/02-my-devices.png",
+      "width": 1667,
+      "height": 890,
+      "sha256": "bd8874ffce8491c143053c7563cc547f9b46fb023bcce9b353bb11cb83ad04fb",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-02"
+    },
+    {
+      "id": "UI-REF-03",
+      "title": "运动姿态识别",
+      "image": "docs/references/luatos/03-motion-recognition.png",
+      "width": 1664,
+      "height": 795,
+      "sha256": "5352f9d4f2ec6aebd81b94a21e3ba679a221eda23b37df8898abb4bad6a6b5cb",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-03"
+    },
+    {
+      "id": "UI-REF-04",
+      "title": "围栏",
+      "image": "docs/references/luatos/04-geofences.png",
+      "width": 1678,
+      "height": 883,
+      "sha256": "92d6f4c6425f5c6f25a41c3a73f5723b1ac65863fd531af2df16df7b94346d9a",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-04"
+    },
+    {
+      "id": "UI-REF-05",
+      "title": "轨迹",
+      "image": "docs/references/luatos/05-tracks.png",
+      "width": 1610,
+      "height": 888,
+      "sha256": "f14e57d5a2bd30b883a27bf487a4470ab745c45d36ee6331128c7fd86229e961",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-05"
+    },
+    {
+      "id": "UI-REF-06",
+      "title": "设备管理",
+      "image": "docs/references/luatos/06-device-management.png",
+      "width": 1679,
+      "height": 869,
+      "sha256": "39634da0defd26f223c05f61d83918024c86e9f90e152ea96e4dec47e6df7ae5",
+      "source": "user_provided_screenshot",
+      "description": "docs/09-ui-screenshot-reference.md#page-06"
+    }
+  ]
+}

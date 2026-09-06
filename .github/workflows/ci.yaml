@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: Go vet / test / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: backend/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build -o /tmp/iotwong-bin/server ./cmd/server
+      - run: go build -o /tmp/iotwong-bin/ingestor ./cmd/ingestor
+      - run: go build -o /tmp/iotwong-bin/import-racebox ./cmd/import-racebox
+      - run: go build -o /tmp/iotwong-bin/migrate ./cmd/migrate
+      - run: go build -o /tmp/iotwong-bin/seed ./cmd/seed
+      - run: go build -o /tmp/iotwong-bin/sim-send ./cmd/sim-send
+
+  web:
+    name: Web check / lint / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run build
+
+  compose:
+    name: Compose files parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if ls compose.yaml compose.standalone.yaml 2>/dev/null | grep -q .; then
+            docker compose config --quiet
+          else
+            echo "compose files not present yet (delivered in T07); skipping"
+          fi

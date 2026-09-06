@@ -1,0 +1,115 @@
+schema_version: 1
+project: iotwong
+updated_at: "2026-09-05"
+status_values: [todo, in_progress, blocked, done]
+tasks:
+  - id: T00
+    title: 合宙协议与登录验证
+    status: blocked
+    depends_on: []
+    spec: docs/05-implementation-plan.md
+    evidence: []
+    block_reason: >-
+      需要用户在官方登录页完成带验证码的真实账号登录并允许读取项目/设备；
+      教程飞书附件经 HTTP 读取为循环重定向无法获取。无浏览器自动化、无用户账号，
+      无法取得真实成功登录证据，不虚构。不阻塞本地任务（docs/PROGRESS.md）。
+  - id: T01
+    title: 工程基线
+    status: done
+    depends_on: []
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "docker run golang:1.27.1-alpine: go vet ./... 通过；go test ./... internal/httpapi ok；go build 产出 server/ingestor/import-racebox"
+      - "docker run node:24-alpine: svelte-check found 0 errors and 0 warnings；npm run lint 通过；npm run build Wrote site to build"
+      - "容器内启动 server 后 curl：/health/live 200 {data:{status:ok}}；/health/ready 200 components:[]；未知路由 404 error.code=not_found；均含 32 位 request_id"
+      - "web 静态产物经 vite preview 访问 / 返回 <title>iotwong 定位设备管理平台</title>（200）"
+      - "npm audit：6 个 low（全为 devDependencies 工具链，audit fix --force 会破坏主版本锁定，暂缓）"
+  - id: T02
+    title: 数据库与迁移
+    status: done
+    depends_on: [T01]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "临时库 iotwong_migtest（owner+postgis3.6.4+timescaledb2.29.1）全新迁移 5/5 成功；重跑 0 pending；组合外键跨租户被拒（devices_tenant_id_project_id_fkey ERROR）；hypertable 跨日写入 2 行成功；随后整库删除"
+      - "真实库 iotwong 以 iotwong_owner 执行迁移 5/5；重跑 nothing to apply；schema_migrations=5"
+      - "iotwong_app 角色实测：可 CONNECT/INSERT/SELECT（事务 ROLLBACK），CREATE TABLE 被拒（permission denied for schema public）"
+      - "catalog：positions hypertable + positions_point_gist_idx/device_latest_point_idx 存在；业务表 0 残留行"
+      - "go vet/test/build 通过（internal/dbmigrate ok）；ADR-009 记录角色边界与 TSL 功能不使用决策；Apache 容器构建验收归 T07"
+  - id: T03
+    title: RaceBox导入
+    status: done
+    depends_on: [T02]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "read-only role iotwong_eadm_ro：CONNECT+SELECT only；UPDATE 被拒；eadm.lc_racebox 行数 8392021 前后不变"
+      - "dry-run 327 行可写、0 拒绝、iotwong 零写入（positions/devices/import_runs 均 0）"
+      - "apply 首轮 rows_new_written=327、device=racebox-aab6ba69、run status=done；positions=327、speed/heading/accuracy 全 NULL、recorded_at UTC 与源 CST 时间一致、device_latest 仅最新点"
+      - "重跑：rows_new_written=0、rows_already_present=327、prior_run_done=true；总行数与 import_runs 不变（幂等）"
+      - "失败路径：apply 首版遇 pgx text 编码错误失败回滚，修正后从 running 态续跑成功"
+      - "go vet/test/build 通过（internal/racebox ok）；ADR-010 记录语义"
+  - id: T04
+    title: 本地定位完整链路
+    status: done
+    depends_on: [T02]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "MQTT 链：sim-send(dev-1, QoS1) → mosquitto(ACL 只读写各自 topic) → ingestor → DB；ACL 用户名即设备 external_id，topic write 仅本机 topic"
+      - "幂等/冲突：同 event 同载荷重发 result=duplicate（0 新增）；同 event 异载荷 result=conflict；positions 无重复行"
+      - "乱序/晚到：recorded_at -10min 历史消息入库，device_latest 仍保持最新（前进规则）；future +10min → poison future_too_far=1 不落库"
+      - "DB 中断：另启 PGPORT=59999 的 ingestor，收到消息后 'message not acked (will be redelivered)'（不 ACK 未落库）；健康 ingestor 同事件落库一次（rows=1, ledger=ok）"
+      - "API：POST /auth/login(Argon2id+HttpOnly cookie) 200；/auth/me 返回 tenant/role=admin；GET /devices 无 cookie 401，登录后 local dev-1 online 含位置/电量，racebox_demo is_demo=true historical；GET /devices?source=local 过滤正常"
+      - "SSE：/api/v1/events 从 Last-Event-ID 续传，replay 历史 + 新事件实时（device.updated，id/event/data 行格式）；heartbeat 注释"
+      - "seed 幂等：admin/dev-1 仅建一次；go vet/test/build 通过（dbmigrate/httpapi/racebox ok）"
+  - id: T05
+    title: 地图与轨迹
+    status: done
+    depends_on: [T03, T04]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "track/positions API 真实数据：racebox 327→51（simplified=true）、dev-1 200 行、positions 游标分页正常、404 越权"
+      - "Headless Chromium(152) + puppeteer-core E2E 全过：错误密码统一提示→真实登录→本地设备/历史回放标签/定位状态→查询轨迹返回 DB 点→MapLibre canvas→390×844 无横向溢出"
+      - "web check 0 errors、lint、build（Wrote site）通过；maplibre-gl 6.7.0 精确锁版"
+      - "地图使用内联离线底图，错误显式降级仍可用；无定位/无轨迹/错误空态文案显式；生产瓦片归属 T07（A15）"
+      - "深色主题与截图式视觉验收、地图集群/性能留 A13/A14（T09 验收轮）"
+  - id: T06
+    title: 合宙真实接入
+    status: blocked
+    depends_on: [T00, T05]
+    block_reason: 依赖 T00（官方带验证码真实登录与协议核验）未完成；本地 Provider 骨架接口已冻结待联调，不编造上游行为
+    spec: docs/05-implementation-plan.md
+    evidence: []
+  - id: T07
+    title: Compose交付
+    status: done
+    depends_on: [T04, T05]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "compose.yaml / compose.standalone.yaml config 校验通过（make compose-check OK）"
+      - "镜像构建成功：iotwong-backend:0.1.0（go 静态多目标）、iotwong-web:0.1.0（node→nginx SPA）"
+      - "全容器冷启动：db(health)→init-db(ext 3 项)→migrate 6/6→api/web healthy；nginx 代理 live/ready 200、401、SPA 深链 200"
+      - "MQTT 链：mosquitto(11890)→ingestor→DB poison device_unknown=1（未注册设备落毒账）"
+      - "重启保持数据：restart api/ingestor 后 ready 200、schema_migrations=6 不变"
+      - "外置 PG 模式：host.docker.internal:8432 对宿主真实库，migrate no-op；nginx 登录 admin 200、/devices 2 台（dev-1+racebox）"
+      - "备份恢复演练：pg_dump -Fc → 隔离库 iotwong_t07restore（重建 ext）→ pg_restore ok（migrations=6、hypertable=1）→ drop"
+      - "standalone DB 镜像 iotwong/pg18-ext:1.0.0（本机 18.4+postgis3.6.4+timescaledb2.29.1）；shared_preload=timescaledb 参数随服务命令固化"
+  - id: T08
+    title: 围栏报警P1
+    status: done
+    depends_on: [T05, T07]
+    spec: docs/05-implementation-plan.md
+    evidence:
+      - "API 创建圆形围栏 r=50m 绑定 dev-1（POST /fences）成功"
+      - "无网页进程：MQTT 位置流经 ingestor 服务端触发 enter/exit 报警 3 条（exit×2+enter×1），fence_states 终态 outside"
+      - "同侧连续消息不重复报警（j3 三段 outside 仅新增 1 条 exit）；首次接触仅建基线不误报"
+      - "POST /alarms/{id}/ack 200 → list acked=true；DELETE /fences 200"
+      - "实现沿 ADR-003/03：位置先落库（ingest tx）后 post-commit 池上评估；历史 racebox 源不触发"
+  - id: T09
+    title: 总体验收
+    status: blocked
+    depends_on: [T06, T07]
+    block_reason: >-
+      A02/A03（合宙真实登录与设备对照）依赖 T06/T00，需用户完成官方验证码登录后补真实证据。
+      本地 P0 验收（A01/A04-A10/A12局部/A13局部/A15局部/A16/A17）在各轮已实测，未完成项明细与证据
+      路径见 docs/PROGRESS.md「T09 本地验收汇总」。
+    spec: docs/05-implementation-plan.md
+    evidence: []

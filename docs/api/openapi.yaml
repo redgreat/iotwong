@@ -1,0 +1,128 @@
+openapi: 3.1.0
+info:
+  title: iotwong HTTP v1 API
+  version: 0.1.0
+  description: |
+    自建定位设备管理平台的同源 HTTP API（docs/04-contracts.md 的机器可读骨架）。
+
+    约定：
+    - 成功响应 `{data:..., request_id:...}`，错误响应 `{error:{code,message,details?}, request_id}`；
+    - 时间为 ISO8601 UTC；ID 为 UUID 字符串（健康接口除外，它无内部信息）；
+    - source 枚举 local / luatos / racebox_demo；
+    - T01 已实现：/api/v1/health/*。auth/projects/devices/positions/track/events/fences/alarms
+      路径属契约范围，由后续任务（T04/T05/T08）逐项实现并在此登记；
+      任何 T00 待验证的合宙回调行为不在此文件伪造。
+servers:
+  - url: /api/v1
+tags:
+  - name: health
+    description: 存活与就绪检查（无认证、无内部连接信息）
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: healthLive
+      summary: 进程存活探测
+      description: 无认证，不输出任何内部连接信息。
+      responses:
+        '200':
+          description: 进程存活
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveResult'
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: healthReady
+      summary: 服务就绪探测
+      description: |
+        评估已注册的必需依赖（T02 起包含 DB/迁移状态）。任一失败返回 503。
+        T01 尚无必需依赖，故 components 为空数组且 ready=true。
+      responses:
+        '200':
+          description: 就绪
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResult'
+        '503':
+          description: 未就绪（错误信封，error.code=service_unavailable）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: |
+            归一化错误码，与 HTTP 状态一一对应：
+            invalid_request(400), unauthorized(401), forbidden(403), not_found(404),
+            conflict(409), rate_limited(429), upstream_unavailable(502/503),
+            service_unavailable(503)。
+        message:
+          type: string
+          description: 面向用户的错误信息；绝不包含上游凭据。
+        details:
+          type: object
+          description: 可选结构化细节（不包含秘密）。
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+        request_id:
+          type: string
+          description: 32 位十六进制请求标识，供日志关联。
+    DataEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+        request_id:
+          type: string
+    LiveResult:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [ok]
+        request_id:
+          type: string
+    ReadyResult:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [ready, components]
+          properties:
+            ready:
+              type: boolean
+            components:
+              type: array
+              items:
+                type: object
+                required: [name, status]
+                properties:
+                  name:
+                    type: string
+                  status:
+                    type: string
+                    enum: [ok, error]
+                  error:
+                    type: string
+        request_id:
+          type: string

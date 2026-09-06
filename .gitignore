@@ -15,3 +15,22 @@ deps
 .rebar3
 _build/
 _checkouts/
+
+# Local secrets and research artifacts
+.env
+.env.*
+!.env.example
+.secrets/
+node_modules/
+artifacts/private/
+
+# Build outputs
+backend/bin/
+*.log
+
+# MQTT dev secrets
+deploy/mosquitto/secret/
+
+# Acceptance-test runtime artifacts (never commit secrets/evidence)
+tests/.seedenv
+tests/evidence/

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iotwong.dev/protocol/location-v1.schema.json",
+  "title": "iotwong 自建 MQTT 定位消息 v1",
+  "description": "topic: iotwong/v1/devices/{device_external_id}/telemetry。仅描述本项目自建协议，不声称合宙/硬件原生兼容（docs/04-contracts.md）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "recorded_at"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "本协议版本，固定 1。"
+    },
+    "event_id": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[\\x21-\\x7E]+$",
+      "description": "发送端幂等标识，重试必须保持相同 event_id 与载荷。"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "设备采集时间，必须带时区（推荐 UTC Z）。"
+    },
+    "position": {
+      "type": ["object", "null"],
+      "description": "null 表示有效心跳但无定位；有值时经纬度/crs/fix 必填，fix=false 不写位置。",
+      "additionalProperties": false,
+      "required": ["longitude", "latitude", "crs", "fix"],
+      "properties": {
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "exclusiveMinimum": false
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "crs": { "const": "WGS84" },
+        "fix": { "type": "boolean" }
+      }
+    },
+    "speed_mps": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "SI 单位 m/s；未知为 null，禁止猜测换算。"
+    },
+    "heading_deg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 360,
+      "exclusiveMaximum": true,
+      "description": "航向角 [0,360)；未知为 null。"
+    },
+    "accuracy_m": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "定位精度（米）；未知为 null。"
+    },
+    "battery_pct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "电量百分比；缺失为 null，不推导。电压不是百分比。"
+    },
+    "location_source": {
+      "type": "string",
+      "enum": ["gnss", "lbs", "wifi", "unknown"]
+    }
+  }
+}

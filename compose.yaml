@@ -1,0 +1,117 @@
+# iotwong — 外置 PostgreSQL 模式（docs/06-deployment.md）。
+# 使用宿主已有 PG。运行前执行 scripts/init-secrets.sh 生成 .env 与 broker 秘密。
+#
+#   docker compose --env-file .env -f compose.yaml up -d --build
+#
+# 服务：web(WEB_PORT→80) · api(仅内部,健康检查) · ingestor · mosquitto(127.0.0.1:MQTT_PORT)
+#      · migrate(一次性，DB 就绪后执行并退出；失败阻止业务启动)
+# PG 经 host.docker.internal 访问（extra_hosts 已加）。
+
+name: iotwong
+
+services:
+  migrate:
+    image: iotwong-backend:0.1.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args: { GOPROXY: "${GOPROXY:-https://proxy.golang.org,direct}", GOSUMDB: "${GOSUMDB:-sum.golang.org}" }
+    command: ["sh", "-c",
+      "for i in $$(seq 1 30); do /usr/local/bin/migrate --dir /migrations && exit 0; sleep 2; done; echo 'migrate: DB unreachable'; exit 1"]
+    environment:
+      PGHOST: ${DB_HOST:-host.docker.internal}
+      PGPORT: ${DB_PORT:-5432}
+      PGDATABASE: ${DB_NAME:-iotwong}
+      PGUSER: ${MIGRATION_DB_USER:-iotwong_owner}
+      PGPASSWORD: ${MIGRATION_DB_PASSWORD:?required}
+    volumes:
+      - ./db/migrations:/migrations:ro
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: "no"
+
+  api:
+    image: iotwong-backend:0.1.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args: { GOPROXY: "${GOPROXY:-https://proxy.golang.org,direct}", GOSUMDB: "${GOSUMDB:-sum.golang.org}" }
+    command: ["server"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      HTTP_ADDR: :8080
+      PGHOST: ${DB_HOST:-host.docker.internal}
+      PGPORT: ${DB_PORT:-5432}
+      PGDATABASE: ${DB_NAME:-iotwong}
+      PGUSER: ${DB_USER:-iotwong_app}
+      PGPASSWORD: ${DB_PASSWORD:?required}
+      SESSION_KEY: ${SESSION_KEY:-dev-only-change-me}
+      LUATOS_ENABLED: "false"
+      MAP_STYLE_URL: ${MAP_STYLE_URL:-}
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/v1/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 6
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ingestor:
+    image: iotwong-backend:0.1.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args: { GOPROXY: "${GOPROXY:-https://proxy.golang.org,direct}", GOSUMDB: "${GOSUMDB:-sum.golang.org}" }
+    command: ["ingestor"]
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USER: ${MQTT_INGESTOR_USER:-iotwong_ingestor}
+      MQTT_PASSWORD: ${MQTT_INGESTOR_PASSWORD:?required}
+      PGHOST: ${DB_HOST:-host.docker.internal}
+      PGPORT: ${DB_PORT:-5432}
+      PGDATABASE: ${DB_NAME:-iotwong}
+      PGUSER: ${DB_USER:-iotwong_app}
+      PGPASSWORD: ${DB_PASSWORD:?required}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      mosquitto: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.21
+    environment:
+      MQTT_INGESTOR_USER: ${MQTT_INGESTOR_USER:-iotwong_ingestor}
+      MQTT_INGESTOR_PASSWORD: ${MQTT_INGESTOR_PASSWORD:?required}
+      MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-dev-1}
+      MQTT_DEVICE_PASSWORD: ${MQTT_DEVICE_PASSWORD:?required}
+      MQTT_DEVICE_ID: ${MQTT_DEVICE_ID:-dev-1}
+    volumes:
+      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./.secrets/mqtt:/mosquitto/secret
+      - mqtt-data:/mosquitto/data
+    ports:
+      - "127.0.0.1:${MQTT_PORT:-1883}:1883"
+    restart: unless-stopped
+
+  web:
+    image: iotwong-web:0.1.0
+    build:
+      context: .
+      dockerfile: deploy/web/Dockerfile
+      args:
+        VITE_MAP_PROVIDER: "${VITE_MAP_PROVIDER:-offline}"
+        VITE_MAP_KEY: "${VITE_MAP_KEY:-}"
+
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api: { condition: service_started }
+    restart: unless-stopped
+
+volumes:
+  mqtt-data:
